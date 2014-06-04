@@ -33,6 +33,7 @@
 
 //function decls
 void die( std::string msg );
+void do_input( sf::RenderWindow &window );
 
 //foward decls
 struct entity;
@@ -93,27 +94,34 @@ struct bullet: entity
 //global vars
 player player;
 crosshair crosshair;
+bool keys[4];
+bool shouldFire;
 
 int main()
 {
 	sf::RenderWindow window( sf::VideoMode( 800, 600 ), "shmup" );
-	sf::Event event;
 	window.setFramerateLimit( FPS );
 	window.setMouseCursorVisible( false );
 
+	player.shape.setPosition( ((float)window.getSize().x)/2, ((float)window.getSize().y)/2 );
+
 	while( window.isOpen() )
-	{
-		while( window.pollEvent( event ) )
-		{
-			if( event.type == sf::Event::Closed )
-				window.close();
+	{	
+		do_input( window );
 
-			
-		}
-
+		if( !keys[0] && !keys[2] )
+			player.vel.y = 0;
+		if( !keys[1] && !keys[3] )
+			player.vel.x = 0;
+		
+		if( keys[0] ) player.vel.y = -player.speed;
+		if( keys[1] ) player.vel.x = -player.speed;
+		if( keys[2] ) player.vel.y = player.speed;
+		if( keys[3] ) player.vel.x = player.speed;
+		
 		player.shape.move( player.vel );
 
-		if ( sf::Mouse::isButtonPressed( sf::Mouse::Left ) && player.canFire() )
+		if ( shouldFire && player.canFire() )
 		{
 			sf::Vector2f v = crosshair.sprite.getPosition() - player.shape.getPosition();
 			double len = sqrt( (v.x*v.x) + (v.y*v.y) );
@@ -124,7 +132,6 @@ int main()
 
 		window.clear( sf::Color::Black );
 
-		crosshair.sprite.setPosition( window.mapPixelToCoords( sf::Mouse::getPosition(window) ) );
 		
 		window.draw( player.getDrawable() );
 
@@ -148,11 +155,86 @@ void die( std::string msg )
 	std::exit( EXIT_FAILURE );
 }
 
+void do_input( sf::RenderWindow &window )
+{
+	sf::Event event;
+
+	while( window.pollEvent( event ) )
+	{
+		switch( event.type )
+		{
+		case sf::Event::Closed:
+			window.close();
+			break;
+
+		case sf::Event::KeyPressed:
+			switch( event.key.code )
+			{
+			case sf::Keyboard::W:
+				keys[0] = true;
+				break;
+			case sf::Keyboard::A:
+				keys[1] = true;
+				break;
+			case sf::Keyboard::S:
+				keys[2] = true;
+				break;
+			case sf::Keyboard::D:
+				keys[3] = true;
+				break;
+			}
+			break;
+
+		case sf::Event::KeyReleased:
+			switch( event.key.code )
+			{
+			case sf::Keyboard::W:
+				keys[0] = false;
+				break;
+			case sf::Keyboard::A:
+				keys[1] = false;
+				break;
+			case sf::Keyboard::S:
+				keys[2] = false;
+				break;
+			case sf::Keyboard::D:
+				keys[3] = false;
+				break;
+			}
+			break;
+
+		case sf::Event::MouseButtonPressed:
+			switch( event.mouseButton.button )
+			{
+			case sf::Mouse::Left:
+				shouldFire = true;
+				break;
+			}
+			break;
+
+		case sf::Event::MouseButtonReleased:
+			switch( event.mouseButton.button )
+			{
+			case sf::Mouse::Left:
+				shouldFire = false;
+				break;
+			}
+			break;
+				
+		case sf::Event::MouseMoved:
+			crosshair.sprite.setPosition( window.mapPixelToCoords( sf::Vector2i( event.mouseMove.x, event.mouseMove.y ) ) );
+						
+		}
+			
+	}
+}
+
 //class methods
 player::player()
 {
 	this->shape = sf::RectangleShape( sf::Vector2f( 25, 25 ) );
-	speed = 30;
+	this->shape.setOrigin( this->shape.getLocalBounds().width / 2, this->shape.getLocalBounds().height / 2 );
+	speed = 2;
 	firingSpeed = 200;
 }
 
@@ -232,6 +314,9 @@ void player::fireBullet( sf::Vector2f dir )
 	bullet *b = new bullet( this );
 	b->vel.x = dir.x * b->speed.x;
 	b->vel.y = dir.y * b->speed.y;
+	
+	b->shape.setPosition( this->shape.getPosition() );
+	
 	this->bullets.push_back( b );
 }
 
