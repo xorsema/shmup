@@ -1,7 +1,7 @@
 SHELL	     = /bin/sh
 CC	     = g++
 FLAGS	     = -std=c++11 
-CFLAGS	     = -Wall 
+CFLAGS	     =  
 DEBUGFLAGS   = -O0 -g
 RELEASEFLAGS = -O2
 TARGET	     = shmup
