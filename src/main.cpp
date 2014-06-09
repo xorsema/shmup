@@ -28,11 +28,14 @@
 #include <cmath>
 #include <ctime>
 #include <iostream>
+#include <string>
+#include <sstream>
 
 #define FPS 60
 #define PI 3.14159265
 #define CROSSHAIR_FILE "res/crosshair.png"
 #define TITLE_FILE "res/title.png"
+#define FONT_FILE "res/DejaVuSansMono.ttf"
 #define STATE_TITLE 1
 #define STATE_GAME 2
 
@@ -52,6 +55,7 @@ struct enemy;
 struct crosshair;
 struct bullet;
 struct enemy_director;
+struct score_director;
 
 //class/struct defs
 struct entity
@@ -123,6 +127,17 @@ struct enemy_director
 	sf::Clock spawnClock;
 	double enemyMinDistance, enemyMaxDistance;
 	unsigned totalSpawned;
+	unsigned totalKilled;
+};
+
+struct score_director
+{
+	score_director();
+	sf::Text text;
+	sf::Font font;
+	std::stringstream ss;
+	std::string label;
+	void setDisplayedScore( unsigned );
 };
 //end defs
 
@@ -130,6 +145,7 @@ struct enemy_director
 player		g_player;
 crosshair	g_crosshair;
 enemy_director	g_enemdir;
+score_director	g_scrdir;
 bool		keys[5];
 bool		shouldFire;
 int		game_state;
@@ -305,7 +321,9 @@ void game_frame( sf::RenderWindow& window )
 		sf::Vector2f v = g_crosshair.sprite.getPosition() - g_player.shape.getPosition();
 		g_player.fireBullet( normalize( v ) );
 	}
-	
+
+	g_scrdir.setDisplayedScore( g_enemdir.totalKilled );
+
 	window.clear( sf::Color::Black );
 	
 	window.draw( g_player.getDrawable() );
@@ -324,6 +342,8 @@ void game_frame( sf::RenderWindow& window )
 	
 	window.draw( g_crosshair.getDrawable() );
 	
+	window.draw( g_scrdir.text );
+
 	window.display();
 }
 void start_screen_init( sf::RenderWindow& window )
@@ -504,6 +524,7 @@ void enemy_director::reset()
 	this->enemyMinDistance = 100.0;
 	this->enemyMaxDistance = 300.0;
 	this->spawnSpeed = sf::seconds( 2.0f );
+	this->totalKilled = 0;
 }
 
 void enemy_director::spawnEnemy( sf::Vector2f pos, sf::Vector2f vel )
@@ -543,8 +564,9 @@ void enemy_director::handleCollisions( std::list<bullet*>& bullets  )
 						auto del = j;
 						enemy *ptr = *del;
 						j++;
-						enemies.erase( del );
+						this->enemies.erase( del );
 						delete ptr;
+						this->totalKilled++;
 					
 					}
 					else
@@ -580,4 +602,23 @@ bool enemy_director::shouldSpawn()
 	return true;
 }
 
+//score_director
+score_director::score_director()
+{
+	this->label = "Killed: ";
+
+	if( !this->font.loadFromFile( FONT_FILE ) )
+	{
+		die( "could not load font file!" );
+	}
+
+	this->text.setFont( this->font );
+}
+
+void score_director::setDisplayedScore( unsigned score )
+{
+	this->ss.str( "" );
+	this->ss << label << score;
+	this->text.setString( sf::String( this->ss.str() ) );
+}
 //end class methods
