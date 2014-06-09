@@ -72,6 +72,7 @@ struct player: entity
 	bool canFire();
 	void fireBullet( sf::Vector2f dir );
 	void reapBullets();
+	bool shouldDie( std::list<enemy*> );
 	sf::RectangleShape shape;
 	std::list<bullet*> bullets;
 	int firingSpeed;
@@ -117,9 +118,11 @@ struct enemy_director
 	void handleCollisions( std::list<bullet*>& );
 	void doAI( const player& );
 	bool shouldSpawn();
+	void reset();
 	sf::Time spawnSpeed;
 	sf::Clock spawnClock;
 	double enemyMinDistance, enemyMaxDistance;
+	unsigned totalSpawned;
 };
 //end defs
 
@@ -155,8 +158,7 @@ int main()
 		case STATE_TITLE:
 			start_screen_frame( window );
 			break;
-		}
-		
+		}	
 	}
 	
 	return 0;
@@ -243,8 +245,7 @@ void do_input( sf::RenderWindow &window )
 		case sf::Event::MouseMoved:
 			g_crosshair.sprite.setPosition( window.mapPixelToCoords( sf::Vector2i( event.mouseMove.x, event.mouseMove.y ) ) );
 						
-		}
-			
+		}			
 	}
 }
 
@@ -263,10 +264,7 @@ void game_init( sf::RenderWindow& window )
 	g_player.shape.setPosition( ((float)window.getSize().x)/2, ((float)window.getSize().y)/2 );
 
 	g_player.canFire();
-
-	g_enemdir.enemyMinDistance = 100.0;
-	g_enemdir.enemyMaxDistance = 300.0;
-	g_enemdir.spawnSpeed = sf::seconds( 2.0f );
+	g_enemdir.reset();
 }
 
 void game_frame( sf::RenderWindow& window )
@@ -290,6 +288,14 @@ void game_frame( sf::RenderWindow& window )
 	
 	g_player.reapBullets();
 	
+	if( g_player.shouldDie( g_enemdir.enemies ) )
+	{
+		g_enemdir.enemies.clear();
+		g_player.bullets.clear();
+		game_init( window );
+		game_state = STATE_TITLE;
+	}
+
 	g_player.shape.move( g_player.vel );
 	
 	g_enemdir.doAI( g_player );
@@ -297,10 +303,7 @@ void game_frame( sf::RenderWindow& window )
 	if ( shouldFire && g_player.canFire() )
 	{
 		sf::Vector2f v = g_crosshair.sprite.getPosition() - g_player.shape.getPosition();
-		double len = sqrt( (v.x*v.x) + (v.y*v.y) );
-		v.x /= len;
-		v.y /= len;
-		g_player.fireBullet( v );
+		g_player.fireBullet( normalize( v ) );
 	}
 	
 	window.clear( sf::Color::Black );
@@ -353,8 +356,8 @@ player::player()
 {
 	this->shape = sf::RectangleShape( sf::Vector2f( 25, 25 ) );
 	this->shape.setOrigin( this->shape.getLocalBounds().width / 2, this->shape.getLocalBounds().height / 2 );
-	speed = 2;
-	firingSpeed = 200;
+	this->speed = 2;
+	this->firingSpeed = 200;
 }
 
 player::player( sf::Vector2f pos )
@@ -416,6 +419,19 @@ void player::reapBullets()
 		else
 			it++;
 	}
+}
+
+bool player::shouldDie( std::list<enemy*> enemies )
+{
+	for( auto it = enemies.begin(); it != enemies.end(); it++ )
+	{
+		if( this->getGlobalBounds().intersects( (*it)->getGlobalBounds() ) )
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 //crosshair
@@ -482,12 +498,25 @@ sf::FloatRect enemy::getGlobalBounds()
 }
 
 //enemy_director
+void enemy_director::reset()
+{
+	this->totalSpawned = 0;
+	this->enemyMinDistance = 100.0;
+	this->enemyMaxDistance = 300.0;
+	this->spawnSpeed = sf::seconds( 2.0f );
+}
+
 void enemy_director::spawnEnemy( sf::Vector2f pos, sf::Vector2f vel )
 {
 	enemy *e = new enemy;
 	e->shape.setPosition( pos );
 	e->vel = vel;
 	this->enemies.push_back( e );
+	this->totalSpawned++;
+	if( totalSpawned % 15 == 0 && this->spawnSpeed > sf::seconds( 0 ) )
+	{
+		this->spawnSpeed -= sf::seconds( .1f );
+	}
 }
 
 void enemy_director::spawnEnemy( const player& p )
